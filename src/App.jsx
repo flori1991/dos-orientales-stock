@@ -110,6 +110,10 @@ const [verificadoHora, setVerificadoHora] = useState('');
   const updateConfigGlobal = async (key, value) => {
     await supabase.from('config_global').upsert({ key, value });
   };
+  const updateComentario = async (productoId, comentario) => {
+    await supabase.from('productos').update({ comentario }).eq('id', productoId);
+    setProductsData(prev => prev.map(p => p.id === productoId ? { ...p, comentario } : p));
+  };
 
   // ---- Stock Fabrica calculado ----
   const stockFabrica = useMemo(() => {
@@ -254,6 +258,7 @@ const [verificadoHora, setVerificadoHora] = useState('');
     setFreezerDate={(v) => { setFreezerDate(v); updateConfigGlobal('freezerDate', v); }}
     setVerificadoDate={(v) => { setVerificadoDate(v); updateConfigGlobal('verificadoDate', v); }}
     setVerificadoHora={(v) => { setVerificadoHora(v); updateConfigGlobal('verificadoHora', v); }}
+    updateComentario={updateComentario}
             onAdjustIngreso={async (ingreso) => {
               const { data } = await supabase.from('ingresos').insert(ingreso).select();
               if (data) setIngresos([...ingresos, ...data]);
@@ -325,7 +330,7 @@ function TabButton({ active, onClick, icon: Icon, children }) {
   );
 }
 
-function Dashboard({ products, productsData, stockManual, stockFabrica, maosolDate, freezerDate, verificadoDate, verificadoHora, user, updateStockManual, setMaosolDate, setFreezerDate, setVerificadoDate, setVerificadoHora, onAdjustIngreso }) {
+function Dashboard({ products, productsData, stockManual, stockFabrica, maosolDate, freezerDate, verificadoDate, verificadoHora, user, updateStockManual, setMaosolDate, setFreezerDate, setVerificadoDate, setVerificadoHora, onAdjustIngreso, updateComentario }) {
   const [adjustModal, setAdjustModal] = useState(null);
   const canAdjust = user.role === 'Administrador' || user.role === 'Encargado';
 
@@ -387,6 +392,7 @@ function Dashboard({ products, productsData, stockManual, stockFabrica, maosolDa
               <th className="px-3 py-3 text-center">MAX. TOTAL</th>
               <th className="px-3 py-3 text-center">ESTADO</th>
               <th className="px-3 py-3 text-center">AJUSTE</th>
+              <th className="px-3 py-3 text-center">COMENTARIOS</th>
             </tr>
           </thead>
           <tbody>
@@ -398,6 +404,7 @@ function Dashboard({ products, productsData, stockManual, stockFabrica, maosolDa
               const total = Number(sm.cantidad) + Number(sf.cantidad) + sFab;
               const diferencia = Number(sv.cantidad) - sFab;
               const cfg = getCfg(producto);
+              const prodData = productsData.find(pd => pd.nombre === producto);
               let estado = 'OK', estadoColor = 'bg-green-100 text-green-800 border-green-300';
               if (total < cfg.minTotal) { estado = 'BAJO MÍNIMO'; estadoColor = 'bg-red-100 text-red-800 border-red-300'; }
               else if (total > cfg.maxTotal) { estado = 'SOBRESTOCK'; estadoColor = 'bg-orange-100 text-orange-800 border-orange-300'; }
@@ -434,6 +441,16 @@ function Dashboard({ products, productsData, stockManual, stockFabrica, maosolDa
                       </button>
                     )}
                   </td>
+                  <td className="px-3 py-2 text-center">
+                    <input
+                      type="text"
+                      maxLength="40"
+                      defaultValue={prodData ? (prodData.comentario || '') : ''}
+                      onBlur={(e) => { if (prodData) updateComentario(prodData.id, e.target.value); }}
+                      placeholder="..."
+                      className="w-40 text-xs border border-blue-200 rounded px-2 py-1"
+                    />
+                  </td>
                 </tr>
               );
             })}
@@ -452,6 +469,7 @@ function Dashboard({ products, productsData, stockManual, stockFabrica, maosolDa
               <td className="px-3 py-3 text-center">{products.reduce((s, p) => s + getCfg(p).minFabrica, 0)}</td>
               <td className="px-3 py-3 text-center">{products.reduce((s, p) => s + getCfg(p).minTotal, 0)}</td>
               <td className="px-3 py-3 text-center">{products.reduce((s, p) => s + getCfg(p).maxTotal, 0)}</td>
+              <td className="px-3 py-3"></td>
               <td className="px-3 py-3"></td>
               <td className="px-3 py-3"></td>
             </tr>
