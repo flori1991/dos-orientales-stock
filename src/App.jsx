@@ -4,7 +4,7 @@ import { Pizza, LogOut, LayoutDashboard, Package, ArrowDownToLine, ArrowUpFromLi
 
 // ⚠️ REEMPLAZÁ ESTOS VALORES CON LOS DE TU PROYECTO SUPABASE
 const SUPABASE_URL = 'https://hrvbgtcbtwojupkuwudj.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhydmJndGNidHdvanVwa3V3dWRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMzc0NjksImV4cCI6MjA5NDcxMzQ2OX0.IBagQquPs2fbzK8qBpilOO3sw5rQl009PtOihjwt55o';
+const SUPABASE_ANON_KEY = 'sb_publishable_NNEBClScUf911FNOkLCEXQ_jZr1ByLc';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -21,14 +21,13 @@ export default function App() {
   const [egresos, setEgresos] = useState([]);
   const [maosolDate, setMaosolDate] = useState(new Date().toISOString().split('T')[0]);
   const [freezerDate, setFreezerDate] = useState(new Date().toISOString().split('T')[0]);
-const [verificadoDate, setVerificadoDate] = useState(new Date().toISOString().split('T')[0]);
-const [verificadoHora, setVerificadoHora] = useState('');
+  const [verificadoDate, setVerificadoDate] = useState(new Date().toISOString().split('T')[0]);
+  const [verificadoHora, setVerificadoHora] = useState('');
 
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // Cargar todos los datos desde Supabase
   const loadAllData = useCallback(async () => {
     try {
       const [usersRes, productsRes, stockRes, ingresosRes, egresosRes, configRes] = await Promise.all([
@@ -56,14 +55,14 @@ const [verificadoHora, setVerificadoHora] = useState('');
       if (ingresosRes.data) setIngresos(ingresosRes.data);
       if (egresosRes.data) setEgresos(egresosRes.data);
       if (configRes.data) {
-  const md = configRes.data.find(c => c.key === 'maosolDate');
-  const fd = configRes.data.find(c => c.key === 'freezerDate');
-  const vd = configRes.data.find(c => c.key === 'verificadoDate');
-  const vh = configRes.data.find(c => c.key === 'verificadoHora');
-  if (md) setMaosolDate(md.value);
-  if (fd) setFreezerDate(fd.value);
-  if (vd) setVerificadoDate(vd.value);
-  if (vh) setVerificadoHora(vh.value || '');
+        const md = configRes.data.find(c => c.key === 'maosolDate');
+        const fd = configRes.data.find(c => c.key === 'freezerDate');
+        const vd = configRes.data.find(c => c.key === 'verificadoDate');
+        const vh = configRes.data.find(c => c.key === 'verificadoHora');
+        if (md) setMaosolDate(md.value);
+        if (fd) setFreezerDate(fd.value);
+        if (vd) setVerificadoDate(vd.value);
+        if (vh) setVerificadoHora(vh.value || '');
       }
     } catch (e) {
       console.error('Error cargando datos:', e);
@@ -77,7 +76,6 @@ const [verificadoHora, setVerificadoHora] = useState('');
     })();
   }, [loadAllData]);
 
-  // Realtime: actualizar cuando cambia algo
   useEffect(() => {
     const channel = supabase
       .channel('stock-changes')
@@ -88,7 +86,6 @@ const [verificadoHora, setVerificadoHora] = useState('');
     return () => { supabase.removeChannel(channel); };
   }, [loadAllData]);
 
-  // ---- Helpers para actualizar Supabase ----
   const updateStockManual = async (producto, tipo, data) => {
     const existing = stockManual[producto] && stockManual[producto][tipo];
     const payload = {
@@ -110,19 +107,21 @@ const [verificadoHora, setVerificadoHora] = useState('');
   const updateConfigGlobal = async (key, value) => {
     await supabase.from('config_global').upsert({ key, value });
   };
+
   const updateComentario = async (productoId, comentario) => {
     await supabase.from('productos').update({ comentario }).eq('id', productoId);
     setProductsData(prev => prev.map(p => p.id === productoId ? { ...p, comentario } : p));
   };
 
-  // ---- Stock Fabrica calculado ----
   const stockFabrica = useMemo(() => {
     const result = {};
     products.forEach(p => { result[p] = 0; });
     ingresos.forEach(i => {
+      if (i.eliminado) return;
       if (result[i.producto] !== undefined) result[i.producto] += Number(i.cantidad) || 0;
     });
     egresos.forEach(e => {
+      if (e.eliminado) return;
       if (result[e.producto] !== undefined) result[e.producto] -= Number(e.cantidad) || 0;
     });
     return result;
@@ -131,6 +130,7 @@ const [verificadoHora, setVerificadoHora] = useState('');
   const stockPorLote = useMemo(() => {
     const lotes = {};
     ingresos.forEach(ing => {
+      if (ing.eliminado) return;
       const key = `${ing.producto}||${ing.lote}`;
       if (!lotes[key]) {
         lotes[key] = {
@@ -144,6 +144,7 @@ const [verificadoHora, setVerificadoHora] = useState('');
       lotes[key].cantidadIngresada += Number(ing.cantidad) || 0;
     });
     egresos.forEach(eg => {
+      if (eg.eliminado) return;
       if (eg.lote === 'COMODIN') return;
       const key = `${eg.producto}||${eg.lote}`;
       if (lotes[key]) lotes[key].cantidadEgresada += Number(eg.cantidad) || 0;
@@ -250,15 +251,15 @@ const [verificadoHora, setVerificadoHora] = useState('');
       </header>
 
       <main className="p-4 md:p-6">
-{tab === 'dashboard' && (
-  <Dashboard products={products} productsData={productsData} stockManual={stockManual} stockFabrica={stockFabrica}
-    maosolDate={maosolDate} freezerDate={freezerDate} verificadoDate={verificadoDate} verificadoHora={verificadoHora} user={user}
-    updateStockManual={updateStockManual}
-    setMaosolDate={(v) => { setMaosolDate(v); updateConfigGlobal('maosolDate', v); }}
-    setFreezerDate={(v) => { setFreezerDate(v); updateConfigGlobal('freezerDate', v); }}
-    setVerificadoDate={(v) => { setVerificadoDate(v); updateConfigGlobal('verificadoDate', v); }}
-    setVerificadoHora={(v) => { setVerificadoHora(v); updateConfigGlobal('verificadoHora', v); }}
-    updateComentario={updateComentario}
+        {tab === 'dashboard' && (
+          <Dashboard products={products} productsData={productsData} stockManual={stockManual} stockFabrica={stockFabrica}
+            maosolDate={maosolDate} freezerDate={freezerDate} verificadoDate={verificadoDate} verificadoHora={verificadoHora} user={user}
+            updateStockManual={updateStockManual}
+            setMaosolDate={(v) => { setMaosolDate(v); updateConfigGlobal('maosolDate', v); }}
+            setFreezerDate={(v) => { setFreezerDate(v); updateConfigGlobal('freezerDate', v); }}
+            setVerificadoDate={(v) => { setVerificadoDate(v); updateConfigGlobal('verificadoDate', v); }}
+            setVerificadoHora={(v) => { setVerificadoHora(v); updateConfigGlobal('verificadoHora', v); }}
+            updateComentario={updateComentario}
             onAdjustIngreso={async (ingreso) => {
               const { data } = await supabase.from('ingresos').insert(ingreso).select();
               if (data) setIngresos([...ingresos, ...data]);
@@ -266,6 +267,11 @@ const [verificadoHora, setVerificadoHora] = useState('');
         )}
         {tab === 'lotes' && <StockPorLote products={products} stockPorLote={stockPorLote} />}
         {tab === 'ingreso' && <IngresoCamara products={products} ingresos={ingresos} user={user}
+          onRestore={async (id) => {
+            const restoreData = { eliminado: false, eliminado_por: null, eliminado_fecha: null };
+            await supabase.from('ingresos').update(restoreData).eq('id', id);
+            setIngresos(ingresos.map(i => i.id === id ? { ...i, ...restoreData } : i));
+          }}
           onAdd={async (data) => {
             const { data: r } = await supabase.from('ingresos').insert(data).select();
             if (r) setIngresos([...ingresos, ...r]);
@@ -275,10 +281,16 @@ const [verificadoHora, setVerificadoHora] = useState('');
             setIngresos(ingresos.map(i => i.id === id ? { ...i, ...data } : i));
           }}
           onDelete={async (id) => {
-            await supabase.from('ingresos').delete().eq('id', id);
-            setIngresos(ingresos.filter(i => i.id !== id));
+            const eliminadoData = { eliminado: true, eliminado_por: user.name, eliminado_fecha: new Date().toISOString() };
+            await supabase.from('ingresos').update(eliminadoData).eq('id', id);
+            setIngresos(ingresos.map(i => i.id === id ? { ...i, ...eliminadoData } : i));
           }} />}
         {tab === 'egreso' && <EgresoCamara products={products} stockPorLote={stockPorLote} egresos={egresos} user={user}
+          onRestore={async (id) => {
+            const restoreData = { eliminado: false, eliminado_por: null, eliminado_fecha: null };
+            await supabase.from('egresos').update(restoreData).eq('id', id);
+            setEgresos(egresos.map(eg => eg.id === id ? { ...eg, ...restoreData } : eg));
+          }}
           onAdd={async (data) => {
             const { data: r } = await supabase.from('egresos').insert(data).select();
             if (r) setEgresos([...egresos, ...r]);
@@ -288,8 +300,9 @@ const [verificadoHora, setVerificadoHora] = useState('');
             setEgresos(egresos.map(eg => eg.id === id ? { ...eg, ...data } : eg));
           }}
           onDelete={async (id) => {
-            await supabase.from('egresos').delete().eq('id', id);
-            setEgresos(egresos.filter(eg => eg.id !== id));
+            const eliminadoData = { eliminado: true, eliminado_por: user.name, eliminado_fecha: new Date().toISOString() };
+            await supabase.from('egresos').update(eliminadoData).eq('id', id);
+            setEgresos(egresos.map(eg => eg.id === id ? { ...eg, ...eliminadoData } : eg));
           }} />}
         {tab === 'config' && canEditConfig && (
           <Configuracion productsData={productsData} users={users} canManageUsers={canManageUsers}
@@ -379,13 +392,13 @@ function Dashboard({ products, productsData, stockManual, stockFabrica, maosolDa
               <th className="px-3 py-3 text-center"><div>STOCK FREEZER</div>
                 <input type="date" value={freezerDate} onChange={(e) => setFreezerDate(e.target.value)} className="mt-1 text-blue-900 text-xs px-1 py-0.5 rounded" /></th>
               <th className="px-3 py-3 text-center bg-blue-800">STOCK TOTAL</th>
-             <th className="px-3 py-3 text-center">
-  <div>STOCK VERIFICADO MANUAL</div>
-  <div className="flex gap-1 mt-1 justify-center">
-    <input type="date" value={verificadoDate} onChange={(e) => setVerificadoDate(e.target.value)} className="text-blue-900 text-xs px-1 py-0.5 rounded" />
-    <input type="time" value={verificadoHora} onChange={(e) => setVerificadoHora(e.target.value)} className="text-blue-900 text-xs px-1 py-0.5 rounded" />
-  </div>
-</th>
+              <th className="px-3 py-3 text-center">
+                <div>STOCK VERIFICADO MANUAL</div>
+                <div className="flex gap-1 mt-1 justify-center">
+                  <input type="date" value={verificadoDate} onChange={(e) => setVerificadoDate(e.target.value)} className="text-blue-900 text-xs px-1 py-0.5 rounded" />
+                  <input type="time" value={verificadoHora} onChange={(e) => setVerificadoHora(e.target.value)} className="text-blue-900 text-xs px-1 py-0.5 rounded" />
+                </div>
+              </th>
               <th className="px-3 py-3 text-center">DIFERENCIA</th>
               <th className="px-3 py-3 text-center">MIN. FABRICA</th>
               <th className="px-3 py-3 text-center">MIN. TOTAL</th>
@@ -423,10 +436,10 @@ function Dashboard({ products, productsData, stockManual, stockFabrica, maosolDa
                       className="w-16 text-center border border-blue-200 rounded px-1 py-0.5" />
                   </td>
                   <td className="px-3 py-2 text-center font-bold text-blue-900 bg-yellow-50">{total}</td>
-           <td className="px-3 py-2 text-center">
-  <input type="number" value={sv.cantidad} onChange={(e) => updateStockManual(producto, 'verificado', { cantidad: Number(e.target.value) || 0 })}
-    className="w-16 text-center border border-blue-200 rounded px-1 py-0.5" />
-</td>
+                  <td className="px-3 py-2 text-center">
+                    <input type="number" value={sv.cantidad} onChange={(e) => updateStockManual(producto, 'verificado', { cantidad: Number(e.target.value) || 0 })}
+                      className="w-16 text-center border border-blue-200 rounded px-1 py-0.5" />
+                  </td>
                   <td className={`px-3 py-2 text-center font-semibold ${difColor}`}>{diferencia}</td>
                   <td className="px-3 py-2 text-center text-blue-800">{cfg.minFabrica}</td>
                   <td className="px-3 py-2 text-center text-blue-800">{cfg.minTotal}</td>
@@ -565,7 +578,10 @@ function StockPorLote({ products, stockPorLote }) {
   );
 }
 
-function IngresoCamara({ products, ingresos, user, onAdd, onUpdate, onDelete }) {
+function IngresoCamara({ products, ingresos, user, onAdd, onUpdate, onDelete, onRestore }) {
+  const [verEliminados, setVerEliminados] = useState(false);
+  const puedeBorrar = user.role === 'Administrador' || user.role === 'Encargado';
+  const ingresosVisibles = verEliminados ? ingresos.filter(i => i.eliminado) : ingresos.filter(i => !i.eliminado);
   const [form, setForm] = useState({ fecha: new Date().toISOString().split('T')[0], producto: '', lote: '', fecha_produccion: '', vencimiento: '', cantidad: '', operario: user.name, observaciones: '' });
   const [editing, setEditing] = useState(null);
   const resetForm = () => { setForm({ fecha: new Date().toISOString().split('T')[0], producto: '', lote: '', fecha_produccion: '', vencimiento: '', cantidad: '', operario: user.name, observaciones: '' }); setEditing(null); };
@@ -601,24 +617,46 @@ function IngresoCamara({ products, ingresos, user, onAdd, onUpdate, onDelete }) 
         </div>
       </div>
       <div className="bg-white rounded-xl shadow overflow-x-auto">
-        <h3 className="font-semibold text-blue-900 p-4 border-b border-blue-100">Historial de Ingresos</h3>
+        <div className="flex justify-between items-center p-4 border-b border-blue-100 flex-wrap gap-2">
+          <h3 className="font-semibold text-blue-900">
+            {verEliminados ? 'Ingresos Eliminados' : 'Historial de Ingresos'}
+          </h3>
+          {puedeBorrar && (
+            <button onClick={() => setVerEliminados(!verEliminados)} className="bg-blue-100 hover:bg-blue-200 text-blue-900 px-3 py-1.5 rounded-lg text-sm font-medium">
+              {verEliminados ? '← Ver Ingresos Activos' : 'Ver Eliminados'}
+            </button>
+          )}
+        </div>
         <table className="w-full text-sm">
           <thead className="bg-blue-700 text-white"><tr>
             <th className="px-3 py-2 text-left">Fecha</th><th className="px-3 py-2 text-left">Producto</th><th className="px-3 py-2 text-left">Lote</th>
             <th className="px-3 py-2 text-left">Prod.</th><th className="px-3 py-2 text-left">Vto.</th><th className="px-3 py-2 text-center">Cant.</th>
-            <th className="px-3 py-2 text-left">Operario</th><th className="px-3 py-2 text-left">Obs.</th><th className="px-3 py-2 text-center">Acciones</th>
+            <th className="px-3 py-2 text-left">Operario</th><th className="px-3 py-2 text-left">Obs.</th>
+            {verEliminados && <th className="px-3 py-2 text-left">Eliminado por</th>}
+            {verEliminados && <th className="px-3 py-2 text-left">Fecha eliminación</th>}
+            <th className="px-3 py-2 text-center">Acciones</th>
           </tr></thead>
           <tbody>
-            {ingresos.length === 0 ? <tr><td colSpan="9" className="px-3 py-6 text-center text-gray-500">No hay ingresos</td></tr>
-            : [...ingresos].reverse().map((i, idx) => (
+            {ingresosVisibles.length === 0 ? <tr><td colSpan={verEliminados ? "11" : "9"} className="px-3 py-6 text-center text-gray-500">{verEliminados ? 'No hay ingresos eliminados' : 'No hay ingresos'}</td></tr>
+            : [...ingresosVisibles].reverse().map((i, idx) => (
               <tr key={i.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
                 <td className="px-3 py-2">{i.fecha}</td><td className="px-3 py-2 font-medium">{i.producto}</td>
                 <td className="px-3 py-2">{i.lote}</td><td className="px-3 py-2">{i.fecha_produccion}</td>
                 <td className="px-3 py-2">{i.vencimiento}</td><td className="px-3 py-2 text-center font-semibold">{i.cantidad}</td>
                 <td className="px-3 py-2">{i.operario}</td><td className="px-3 py-2 text-xs">{i.observaciones}</td>
+                {verEliminados && <td className="px-3 py-2 text-xs">{i.eliminado_por}</td>}
+                {verEliminados && <td className="px-3 py-2 text-xs">{i.eliminado_fecha ? new Date(i.eliminado_fecha).toLocaleString('es-UY') : ''}</td>}
                 <td className="px-3 py-2 text-center"><div className="flex gap-1 justify-center">
-                  <button onClick={() => handleEdit(i)} className="bg-yellow-400 hover:bg-yellow-500 text-blue-900 p-1.5 rounded"><Edit2 className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => { if (confirm('¿Eliminar?')) onDelete(i.id); }} className="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                  {verEliminados ? (
+                    <button onClick={() => { if (confirm('¿Restaurar este ingreso?')) onRestore(i.id); }} className="bg-green-500 hover:bg-green-600 text-white p-1.5 rounded text-xs font-medium px-2">Restaurar</button>
+                  ) : (
+                    <>
+                      <button onClick={() => handleEdit(i)} className="bg-yellow-400 hover:bg-yellow-500 text-blue-900 p-1.5 rounded"><Edit2 className="w-3.5 h-3.5" /></button>
+                      {puedeBorrar && (
+                        <button onClick={() => { if (confirm('¿Eliminar?')) onDelete(i.id); }} className="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                      )}
+                    </>
+                  )}
                 </div></td>
               </tr>
             ))}
@@ -629,7 +667,10 @@ function IngresoCamara({ products, ingresos, user, onAdd, onUpdate, onDelete }) 
   );
 }
 
-function EgresoCamara({ products, stockPorLote, egresos, user, onAdd, onUpdate, onDelete }) {
+function EgresoCamara({ products, stockPorLote, egresos, user, onAdd, onUpdate, onDelete, onRestore }) {
+  const [verEliminados, setVerEliminados] = useState(false);
+  const puedeBorrar = user.role === 'Administrador' || user.role === 'Encargado';
+  const egresosVisibles = verEliminados ? egresos.filter(eg => eg.eliminado) : egresos.filter(eg => !eg.eliminado);
   const [form, setForm] = useState({ fecha: new Date().toISOString().split('T')[0], producto: '', lote: '', cantidad: '', destino: '', operario: user.name, observaciones: '' });
   const [editing, setEditing] = useState(null);
   const lotesDisponibles = useMemo(() => !form.producto ? [] : stockPorLote.filter(l => l.producto === form.producto && l.stockDisponible > 0), [form.producto, stockPorLote]);
@@ -665,24 +706,46 @@ function EgresoCamara({ products, stockPorLote, egresos, user, onAdd, onUpdate, 
         </div>
       </div>
       <div className="bg-white rounded-xl shadow overflow-x-auto">
-        <h3 className="font-semibold text-blue-900 p-4 border-b border-blue-100">Historial de Egresos</h3>
+        <div className="flex justify-between items-center p-4 border-b border-blue-100 flex-wrap gap-2">
+          <h3 className="font-semibold text-blue-900">
+            {verEliminados ? 'Egresos Eliminados' : 'Historial de Egresos'}
+          </h3>
+          {puedeBorrar && (
+            <button onClick={() => setVerEliminados(!verEliminados)} className="bg-blue-100 hover:bg-blue-200 text-blue-900 px-3 py-1.5 rounded-lg text-sm font-medium">
+              {verEliminados ? '← Ver Egresos Activos' : 'Ver Eliminados'}
+            </button>
+          )}
+        </div>
         <table className="w-full text-sm">
           <thead className="bg-blue-700 text-white"><tr>
             <th className="px-3 py-2 text-left">Fecha</th><th className="px-3 py-2 text-left">Producto</th><th className="px-3 py-2 text-left">Lote</th>
             <th className="px-3 py-2 text-center">Cant.</th><th className="px-3 py-2 text-left">Destino</th>
-            <th className="px-3 py-2 text-left">Operario</th><th className="px-3 py-2 text-left">Obs.</th><th className="px-3 py-2 text-center">Acciones</th>
+            <th className="px-3 py-2 text-left">Operario</th><th className="px-3 py-2 text-left">Obs.</th>
+            {verEliminados && <th className="px-3 py-2 text-left">Eliminado por</th>}
+            {verEliminados && <th className="px-3 py-2 text-left">Fecha eliminación</th>}
+            <th className="px-3 py-2 text-center">Acciones</th>
           </tr></thead>
           <tbody>
-            {egresos.length === 0 ? <tr><td colSpan="8" className="px-3 py-6 text-center text-gray-500">No hay egresos</td></tr>
-            : [...egresos].reverse().map((eg, idx) => (
+            {egresosVisibles.length === 0 ? <tr><td colSpan={verEliminados ? "10" : "8"} className="px-3 py-6 text-center text-gray-500">{verEliminados ? 'No hay egresos eliminados' : 'No hay egresos'}</td></tr>
+            : [...egresosVisibles].reverse().map((eg, idx) => (
               <tr key={eg.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
                 <td className="px-3 py-2">{eg.fecha}</td><td className="px-3 py-2 font-medium">{eg.producto}</td>
                 <td className="px-3 py-2">{eg.lote}</td><td className="px-3 py-2 text-center font-semibold">{eg.cantidad}</td>
                 <td className="px-3 py-2">{eg.destino}</td><td className="px-3 py-2">{eg.operario}</td>
                 <td className="px-3 py-2 text-xs">{eg.observaciones}</td>
+                {verEliminados && <td className="px-3 py-2 text-xs">{eg.eliminado_por}</td>}
+                {verEliminados && <td className="px-3 py-2 text-xs">{eg.eliminado_fecha ? new Date(eg.eliminado_fecha).toLocaleString('es-UY') : ''}</td>}
                 <td className="px-3 py-2 text-center"><div className="flex gap-1 justify-center">
-                  <button onClick={() => handleEdit(eg)} className="bg-yellow-400 hover:bg-yellow-500 text-blue-900 p-1.5 rounded"><Edit2 className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => { if (confirm('¿Eliminar?')) onDelete(eg.id); }} className="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                  {verEliminados ? (
+                    <button onClick={() => { if (confirm('¿Restaurar este egreso?')) onRestore(eg.id); }} className="bg-green-500 hover:bg-green-600 text-white p-1.5 rounded text-xs font-medium px-2">Restaurar</button>
+                  ) : (
+                    <>
+                      <button onClick={() => handleEdit(eg)} className="bg-yellow-400 hover:bg-yellow-500 text-blue-900 p-1.5 rounded"><Edit2 className="w-3.5 h-3.5" /></button>
+                      {puedeBorrar && (
+                        <button onClick={() => { if (confirm('¿Eliminar?')) onDelete(eg.id); }} className="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                      )}
+                    </>
+                  )}
                 </div></td>
               </tr>
             ))}
